@@ -38,7 +38,7 @@ namespace ClipManager
             {
                 foreach (var clip in clips)
                 {
-                    var fileName = SanitizeFile($"v{clip.view_count:00000000}[{clip.created_at}] {clip.title} by {clip.creator_name}-{clip.id}.mp4");
+                    var fileName = SanitizeFile($"{clip.created_at} - {clip.title} - {clip.creator_name} - v{clip.view_count:00000000}-{clip.id}.mp4");
                     var savePath = Path.Combine(folder, fileName);
                     try
                     {
@@ -77,8 +77,8 @@ namespace ClipManager
                 resume = resumeResp.ToLower().StartsWith('y');
                 if (resume)
                 {
-                    using var fs = File.OpenRead(configPath);
-                    using var fsr = new StreamReader(fs);
+                    var fs = File.OpenRead(configPath);
+                    var fsr = new StreamReader(fs);
                     var config = JObject.Parse(fsr.ReadToEnd());
                     Cursor = config["cursor"]?.ToString();
 
@@ -106,6 +106,12 @@ namespace ClipManager
             Console.WriteLine("Delete (y or n):");
             var deleteResp = Console.ReadLine();
             Delete = deleteResp.ToLower().StartsWith('y');
+            if (Delete)
+            {
+                Console.WriteLine("Are you REALLY sure you want to Delete (non-reversible!) (y or n):");
+                var deleteRespConfirm = Console.ReadLine();
+                Delete = deleteRespConfirm.ToLower().StartsWith('y');
+            }
 
             var configPath = Path.Combine(RootPath, "appsettings.json");
             var config = new JObject()
@@ -114,8 +120,8 @@ namespace ClipManager
                 ["download"] = Download,
                 ["delete"] = Delete
             };
-            using var fsw = File.OpenWrite(configPath);
-            using var sw = new StreamWriter(fsw);
+            var fsw = File.OpenWrite(configPath);
+            var sw = new StreamWriter(fsw);
             sw.Write(config.ToString());
             sw.Close();
         }
@@ -126,8 +132,8 @@ namespace ClipManager
             JObject config = new JObject();
             if (File.Exists(configPath))
             {
-                using var fsr = File.OpenRead(configPath);
-                using var sr = new StreamReader(fsr);
+                var fsr = File.OpenRead(configPath);
+                var sr = new StreamReader(fsr);
                 config = JObject.Parse(sr.ReadToEnd());
                 fsr.Close();
 
@@ -135,8 +141,8 @@ namespace ClipManager
             }
             config["cursor"] = Cursor;
 
-            using var fsw = File.OpenWrite(configPath);
-            using var sw = new StreamWriter(fsw);
+            var fsw = File.OpenWrite(configPath);
+            var sw = new StreamWriter(fsw);
             sw.Write(config.ToString());
             sw.Close();
         }
@@ -210,7 +216,7 @@ namespace ClipManager
                     id = node.slug,
                     title = node.title,
                     creator_name = creator,
-                    created_at = node.createdAt,
+                    created_at = DateTime.Parse(Convert.ToString(node.createdAt)).ToString("yyyy-MM-ddThh:mm:ss"),
                     view_count = node.viewCount
                 });
                 if (!Delete && e.cursor != null && hasNextPage)
@@ -288,11 +294,11 @@ namespace ClipManager
 
         static void DownloadClip(string sourceUrl, string savePath)
         {
-            using var http = new HttpClient();
+            var http = new HttpClient();
             var stream = http.GetStreamAsync(sourceUrl).GetAwaiter().GetResult();
             if (File.Exists(savePath))
                 File.Delete(savePath);
-            using var fs = new FileStream(savePath, FileMode.CreateNew);
+            var fs = new FileStream(savePath, FileMode.CreateNew);
             stream.CopyTo(fs);
             fs.Close();
         }
