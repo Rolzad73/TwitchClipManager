@@ -23,11 +23,14 @@ namespace ClipManager
         static string UserId;
         static string Login;
         static string Cursor;
+        static string StartDateTime;
+        static string EndDateTime;
         static bool Download = false;
         static bool Delete = false;
         static string RootPath = Environment.CurrentDirectory;
         static void Main(string[] args)
         {
+            Console.WriteLine($"--== TwitchClipDownloader ==--");
             LoadConfig();
             GetUserID();
             var folder = Path.Combine(RootPath, "downloads");
@@ -38,22 +41,33 @@ namespace ClipManager
             {
                 foreach (var clip in clips)
                 {
-                    var fileName = SanitizeFile($"{clip.created_at} - {clip.title} - {clip.creator_name} - v{clip.view_count:00000000}-{clip.id}.mp4");
-                    var savePath = Path.Combine(folder, fileName);
-                    try
+                    if (DateTime.Parse(clip.created_at) >= 
+                        DateTime.Parse(StartDateTime) &&  
+                        DateTime.Parse(clip.created_at) <= 
+                        DateTime.Parse(EndDateTime))
                     {
-                        var sourceUrl = GetClipUri(clip.id);
-                        if (Download)
+                        var fileName = SanitizeFile($"{clip.created_at} - {clip.title} - {clip.creator_name} - {clip.id}.mp4");
+                        var savePath = Path.Combine(folder, fileName);
+                        try
                         {
-                            Console.WriteLine($"Downloading {clip.id} - {clip.title} by {clip.creator_name}");
-                            DownloadClip(sourceUrl, savePath);
+                            if (Download)
+                            {
+                                Console.WriteLine($"Downloading {clip.id} - {clip.title} by {clip.creator_name}");
+                                var sourceUrl = GetClipUri(clip.id);
+                                DownloadClip(sourceUrl, savePath);
+                            }
+                            else
+                            {
+                                Console.WriteLine($"Found {fileName}");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            File.AppendAllText(Path.Combine(RootPath, "error.log"), $"{clip.id} download failed: {ex.Message}");
                         }
                     }
-                    catch (Exception ex)
-                    {
-                        File.AppendAllText(Path.Combine(RootPath, "error.log"), $"{clip.id} download failed: {ex.Message}");
-                    }
                 }
+                // TODO: this delete removes batch of returns, need to adjust to individually delete on date range filter match
                 if (Delete)
                 {
                     Console.WriteLine($"Deleting {string.Join(',', clips.Select(c => c.id))}");
@@ -64,6 +78,7 @@ namespace ClipManager
                     break;
                 clips = GetClips();
             }
+            Console.WriteLine($"--== FIN ==--");
         }
 
         static void LoadConfig()
@@ -81,8 +96,11 @@ namespace ClipManager
                     var fsr = new StreamReader(fs);
                     var config = JObject.Parse(fsr.ReadToEnd());
                     Cursor = config["cursor"]?.ToString();
-
                     TwitchToken = config["twitchtoken"]?.ToString();
+
+                    StartDateTime = config["startdatetime"]?.ToString();
+                    EndDateTime = config["enddatetime"]?.ToString();
+
                     Download = config["download"]?.ToObject<bool>() == true;
                     Delete = config["delete"]?.ToObject<bool>() == true;
                 }
@@ -100,9 +118,21 @@ namespace ClipManager
             Console.WriteLine("Paste in auth token:");
             TwitchToken = Console.ReadLine().Trim();
 
+            Console.WriteLine("Start Date ('yyyy-MM-ddThh:mm:ss' or blank for very first):");
+            var startDateTimeResp = Console.ReadLine();
+            if (startDateTimeResp == "") StartDateTime = DateTime.UnixEpoch.ToString();
+            else StartDateTime = startDateTimeResp;
+
+            Console.WriteLine("End Date ('yyyy-MM-ddThh:mm:ss' or blank for very last):");
+            var endDateTimeResp = Console.ReadLine();
+            if (endDateTimeResp == "") EndDateTime = DateTime.UtcNow.ToString();
+            else EndDateTime = endDateTimeResp;
+
+
             Console.WriteLine("Download (y or n):");
             var downloadResp = Console.ReadLine();
             Download = downloadResp.ToLower().StartsWith('y');
+
             Console.WriteLine("Delete (y or n):");
             var deleteResp = Console.ReadLine();
             Delete = deleteResp.ToLower().StartsWith('y');
@@ -117,6 +147,9 @@ namespace ClipManager
             var config = new JObject()
             {
                 ["twitchtoken"] = TwitchToken,
+                ["startdatetime"] = StartDateTime,
+                ["enddatetime"] = EndDateTime,
+
                 ["download"] = Download,
                 ["delete"] = Delete
             };
@@ -149,14 +182,22 @@ namespace ClipManager
 
         static void GetUserID()
         {
-            var http = new HttpClient();
-            http.DefaultRequestHeaders.Add("Client-ID", TwitchClientID);
-            http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", TwitchToken);
+            try
+            {
+                var http = new HttpClient();
+                http.DefaultRequestHeaders.Add("Client-ID", TwitchClientID);
+                http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", TwitchToken);
 
-            var res = http.GetStringAsync($"https://api.twitch.tv/helix/users").GetAwaiter().GetResult();
-            var jtok = JToken.Parse(res);
-            UserId = jtok["data"][0]["id"].ToString();
-            Login = jtok["data"][0]["login"].ToString();
+                var res = http.GetStringAsync($"https://api.twitch.tv/helix/users").GetAwaiter().GetResult();
+                var jtok = JToken.Parse(res);
+                UserId = jtok["data"][0]["id"].ToString();
+                Login = jtok["data"][0]["login"].ToString();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"{TwitchClientID} get user id failed: {ex.Message}");
+                System.Environment.Exit(1);
+            }
         }
 
         static IList<ClipInfo> GetClips()
@@ -195,6 +236,7 @@ namespace ClipManager
             var ghttp = new HttpClient();
             ghttp.DefaultRequestHeaders.Add("Client-ID", TwitchClientID);
             ghttp.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("OAuth", TwitchToken);
+            // TODO: need to change this to official "helix" api as using this gql way may have consequences
             var res = ghttp.PostAsync("https://gql.twitch.tv/gql", new StringContent(content)).GetAwaiter().GetResult().Content.ReadAsStringAsync().GetAwaiter().GetResult();
             var jtok = JArray.Parse(res);
             var retVal = new List<ClipInfo>();

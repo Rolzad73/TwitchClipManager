@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.28803.156
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ClipManager", "ClipManager.csproj", "{50D9666B-DED7-420B-B62B-3289F9D88991}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{50D9666B-DED7-420B-B62B-3289F9D88991}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{50D9666B-DED7-420B-B62B-3289F9D88991}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{50D9666B-DED7-420B-B62B-3289F9D88991}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{50D9666B-DED7-420B-B62B-3289F9D88991}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {92031DFF-9DBA-4B0B-B83C-382E179B8EAD}
+	EndGlobalSection
+EndGlobal
