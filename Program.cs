@@ -294,7 +294,10 @@ namespace ClipManager
             ghttp.DefaultRequestHeaders.Add("Client-ID", TwitchClientID);
             var res = ghttp.PostAsync("https://gql.twitch.tv/gql", new StringContent(content)).GetAwaiter().GetResult().Content.ReadAsStringAsync().GetAwaiter().GetResult();
             var jtok = JArray.Parse(res);
-            return jtok[0]["data"]["clip"]["videoQualities"][0]["sourceURL"].ToString();
+            string sourceURL = jtok[0]["data"]["clip"]["videoQualities"][0]["sourceURL"].ToString();
+            // FIXME: 2021-06-01 - temp workaround Twitch changed API, but older environment still works, just replace CDN
+            string sourceURLWorkaround = sourceURL.Replace("https://production.assets.clips.twitchcdn.net", "https://clips-media-assets2.twitch.tv");
+            return sourceURLWorkaround;
         }
 
         static void DeleteClips(IList<string> clips)
@@ -336,13 +339,22 @@ namespace ClipManager
 
         static void DownloadClip(string sourceUrl, string savePath)
         {
-            var http = new HttpClient();
-            var stream = http.GetStreamAsync(sourceUrl).GetAwaiter().GetResult();
-            if (File.Exists(savePath))
-                File.Delete(savePath);
-            var fs = new FileStream(savePath, FileMode.CreateNew);
-            stream.CopyTo(fs);
-            fs.Close();
+            Console.WriteLine($"--== DownloadClip ==--");
+            Console.WriteLine(sourceUrl);
+
+            try {
+                var http = new HttpClient();
+                var stream = http.GetStreamAsync(sourceUrl).GetAwaiter().GetResult(); // failing here (404 return code)
+                if (File.Exists(savePath))
+                    File.Delete(savePath);
+                var fs = new FileStream(savePath, FileMode.CreateNew);
+                stream.CopyTo(fs);
+                fs.Close();
+            }
+            catch (HttpRequestException hre)
+            {
+                Console.WriteLine(hre.Message);
+            }
         }
 
         static string SanitizeFile(string origFileName)
